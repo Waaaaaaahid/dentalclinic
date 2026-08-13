@@ -1,11 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
-import { apiPlugin } from './src/lib/api-plugin';
 
-// https://vitejs.dev/config/
+// Vercel serves API routes from /api; keep the Vite config frontend-only.
 export default defineConfig({
-  plugins: [react(), apiPlugin()],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
