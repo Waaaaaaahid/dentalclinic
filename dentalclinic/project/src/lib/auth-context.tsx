@@ -14,8 +14,9 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
 const TOKEN_KEY = 'lumiere_token';
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const api = (path: string) => `${API_URL}${path}`;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -28,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    fetch('/api/auth/verify', {
+    fetch(api('/api/auth/verify'), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (res) => {
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/signup', {
+      const res = await fetch(api('/api/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -66,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/signin', {
+      const res = await fetch(api('/api/auth/signin'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
