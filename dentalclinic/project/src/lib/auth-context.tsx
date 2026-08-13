@@ -16,13 +16,10 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const TOKEN_KEY = 'lumiere_token';
 
-// VITE_API_URL can override this in Vercel/Render. The fallback points to the
-// deployed Express API so auth does not silently call a static frontend's /api.
-const API_URL = (
-  import.meta.env.VITE_API_URL || 'https://dentalclinic-5bxy.onrender.com'
-).replace(/\/$/, '');
-
-const api = (path: string) => `${API_URL}${path}`;
+// Use the same Vercel origin for auth. The repository already contains
+// Vercel serverless auth at /api/auth/[action].js, so this avoids the
+// frontend -> Render CORS/URL mismatch completely.
+const api = (path: string) => path;
 
 async function parseResponse(res: Response) {
   const text = await res.text();
@@ -54,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const data = await parseResponse(res);
-        setUser(data.user);
+        setUser(data.user ?? null);
       })
       .catch(() => {
         localStorage.removeItem(TOKEN_KEY);
@@ -72,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign up failed' };
+      if (!data.token || !data.user) return { error: 'Invalid response from account server.' };
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser(data.user);
       return { error: null };
@@ -90,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign in failed' };
+      if (!data.token || !data.user) return { error: 'Invalid response from account server.' };
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser(data.user);
       return { error: null };
