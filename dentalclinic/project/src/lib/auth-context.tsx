@@ -15,8 +15,23 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 const TOKEN_KEY = 'lumiere_token';
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+// VITE_API_URL can override this in Vercel/Render. The fallback points to the
+// deployed Express API so auth does not silently call a static frontend's /api.
+const API_URL = (
+  import.meta.env.VITE_API_URL || 'https://dentalclinic-5bxy.onrender.com'
+).replace(/\/$/, '');
+
 const api = (path: string) => `${API_URL}${path}`;
+
+async function parseResponse(res: Response) {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: `Server returned HTTP ${res.status}` };
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -38,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           return;
         }
-        const data = await res.json();
+        const data = await parseResponse(res);
         setUser(data.user);
       })
       .catch(() => {
@@ -55,13 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign up failed' };
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser(data.user);
       return { error: null };
-    } catch {
-      return { error: 'Network error. Please check your connection and try again.' };
+    } catch (error) {
+      console.error('[auth signup]', error);
+      return { error: 'Unable to reach the account server. Please try again.' };
     }
   };
 
@@ -72,13 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign in failed' };
       localStorage.setItem(TOKEN_KEY, data.token);
       setUser(data.user);
       return { error: null };
-    } catch {
-      return { error: 'Network error. Please check your connection and try again.' };
+    } catch (error) {
+      console.error('[auth signin]', error);
+      return { error: 'Unable to reach the account server. Please try again.' };
     }
   };
 
