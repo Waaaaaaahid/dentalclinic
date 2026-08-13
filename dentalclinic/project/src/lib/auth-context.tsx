@@ -1,10 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-interface AuthUser {
-  id: string;
-  email: string;
-}
-
+interface AuthUser { id: string; email: string; }
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
@@ -16,18 +12,15 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const TOKEN_KEY = 'lumiere_token';
 
-// Use the same Vercel origin for auth. The repository already contains
-// Vercel serverless auth at /api/auth/[action].js, so this avoids the
-// frontend -> Render CORS/URL mismatch completely.
-const api = (path: string) => path;
+// Render Express is the authentication backend. Set VITE_API_URL in the
+// frontend deployment to the Render service URL (without a trailing slash).
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const api = (path: string) => `${API_URL}${path}`;
 
 async function parseResponse(res: Response) {
   const text = await res.text();
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    return { error: `Server returned HTTP ${res.status}` };
-  }
+  try { return text ? JSON.parse(text) : {}; }
+  catch { return { error: `Server returned HTTP ${res.status}` }; }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -36,42 +29,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    fetch(api('/api/auth/verify'), {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    if (!token) { setLoading(false); return; }
+    fetch(api('/api/auth/verify'), { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
-        if (!res.ok) {
-          localStorage.removeItem(TOKEN_KEY);
-          setUser(null);
-          return;
-        }
+        if (!res.ok) { localStorage.removeItem(TOKEN_KEY); setUser(null); return; }
         const data = await parseResponse(res);
         setUser(data.user ?? null);
       })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        setUser(null);
-      })
+      .catch(() => { localStorage.removeItem(TOKEN_KEY); setUser(null); })
       .finally(() => setLoading(false));
   }, []);
 
   const signUp = async (email: string, password: string) => {
     try {
       const res = await fetch(api('/api/auth/signup'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign up failed' };
       if (!data.token || !data.user) return { error: 'Invalid response from account server.' };
-      localStorage.setItem(TOKEN_KEY, data.token);
-      setUser(data.user);
+      localStorage.setItem(TOKEN_KEY, data.token); setUser(data.user);
       return { error: null };
     } catch (error) {
       console.error('[auth signup]', error);
@@ -82,15 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       const res = await fetch(api('/api/auth/signin'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
       const data = await parseResponse(res);
       if (!res.ok) return { error: data.error ?? 'Sign in failed' };
       if (!data.token || !data.user) return { error: 'Invalid response from account server.' };
-      localStorage.setItem(TOKEN_KEY, data.token);
-      setUser(data.user);
+      localStorage.setItem(TOKEN_KEY, data.token); setUser(data.user);
       return { error: null };
     } catch (error) {
       console.error('[auth signin]', error);
@@ -98,16 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signOut = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    setUser(null);
-  };
+  const signOut = () => { localStorage.removeItem(TOKEN_KEY); setUser(null); };
 
-  return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
